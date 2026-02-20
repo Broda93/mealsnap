@@ -1,65 +1,185 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState, useEffect, useCallback } from "react";
+import { toast } from "sonner";
+import { motion } from "framer-motion";
+import { Utensils, Plus, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { MealCard } from "@/components/meal-card";
+import { DailySummary } from "@/components/daily-summary";
+import { MacroRing } from "@/components/macro-ring";
+import { BodyFatCard } from "@/components/body-fat-card";
+import { DietTypeCard } from "@/components/diet-type-card";
+import { IFTimer } from "@/components/if-timer";
+import { DashboardSkeleton } from "@/components/skeletons";
+import { useAuth } from "@/lib/auth-context";
+import type { Meal } from "@/lib/types";
+
+function getGreeting(): { text: string; emoji: string } {
+  const h = new Date().getHours();
+  if (h < 6) return { text: "Dobrej nocy", emoji: "🌙" };
+  if (h < 12) return { text: "Dzien dobry", emoji: "☀️" };
+  if (h < 18) return { text: "Dobre popoludnie", emoji: "🌤️" };
+  return { text: "Dobry wieczor", emoji: "🌆" };
+}
+
+const stagger = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.08 },
+  },
+};
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 16 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" as const } },
+};
+
+export default function Dashboard() {
+  const { profile, loading: authLoading } = useAuth();
+  const [meals, setMeals] = useState<Meal[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const today = new Date().toISOString().substring(0, 10);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const mealsRes = await fetch(`/api/meals?from=${today}&to=${today}`);
+      if (mealsRes.ok) {
+        setMeals(await mealsRes.json());
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [today]);
+
+  useEffect(() => {
+    if (!authLoading) {
+      fetchData();
+    }
+  }, [fetchData, authLoading]);
+
+  const handleDelete = async (id: string) => {
+    const res = await fetch(`/api/meals?id=${id}`, { method: "DELETE" });
+    if (res.ok) {
+      setMeals((prev) => prev.filter((m) => m.id !== id));
+      toast.success("Posilek usuniety");
+    } else {
+      toast.error("Nie udalo sie usunac posilku");
+    }
+  };
+
+  const handleUpdate = (updated: Meal) => {
+    setMeals((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+  };
+
+  const totalCalories = meals.reduce((s, m) => s + m.calories, 0);
+  const totalProtein = meals.reduce((s, m) => s + m.protein_g, 0);
+  const totalCarbs = meals.reduce((s, m) => s + m.carbs_g, 0);
+  const totalFat = meals.reduce((s, m) => s + m.fat_g, 0);
+  const calorieTarget = profile?.daily_calorie_target || 2000;
+  const greeting = getGreeting();
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div className="space-y-6">
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex items-center justify-between"
+      >
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <span>{greeting.emoji}</span>
+            <span>{greeting.text},</span>
+            <span className="text-[var(--accent)]">{profile?.name || "..."}</span>
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="text-[var(--text-secondary)] text-sm">
+            {new Date().toLocaleDateString("pl-PL", {
+              weekday: "long",
+              day: "numeric",
+              month: "long",
+            })}
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+        <Link href="/add">
+          <Button className="bg-[var(--accent)] hover:bg-[var(--accent-deep)] text-white rounded-xl shadow-sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Dodaj
+          </Button>
+        </Link>
+      </motion.div>
+
+      {loading || authLoading ? (
+        <DashboardSkeleton />
+      ) : (
+        <motion.div
+          variants={stagger}
+          initial="hidden"
+          animate="show"
+          className="space-y-4"
+        >
+          {/* IF Timer */}
+          {profile?.if_enabled && (
+            <motion.div variants={fadeUp}>
+              <IFTimer profile={profile} />
+            </motion.div>
+          )}
+
+          {/* Bento grid - hero row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <motion.div variants={fadeUp} className="md:row-span-1">
+              <DailySummary totalCalories={totalCalories} calorieTarget={calorieTarget} />
+            </motion.div>
+            <motion.div variants={fadeUp}>
+              <MacroRing protein={totalProtein} carbs={totalCarbs} fat={totalFat} />
+            </motion.div>
+          </div>
+
+          {/* Secondary row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <motion.div variants={fadeUp}>
+              <DietTypeCard proteinG={totalProtein} carbsG={totalCarbs} fatG={totalFat} />
+            </motion.div>
+            {profile?.body_fat_percent && (
+              <motion.div variants={fadeUp}>
+                <BodyFatCard bodyFatPercent={profile.body_fat_percent} gender={profile.gender} />
+              </motion.div>
+            )}
+          </div>
+
+          {/* Meals section */}
+          <motion.div variants={fadeUp} className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Utensils className="h-4 w-4 text-[var(--accent)]" />
+              <h2 className="font-semibold">Dzisiejsze posilki</h2>
+              <span className="text-[var(--text-secondary)] text-sm">({meals.length})</span>
+            </div>
+            {meals.length === 0 ? (
+              <div className="warm-card text-center py-12 px-4">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4" style={{ backgroundColor: "var(--accent)", opacity: 0.1 }}>
+                  <Sparkles className="h-8 w-8 text-[var(--accent)]" />
+                </div>
+                <p className="text-[var(--text-secondary)]">Brak posilkow dzisiaj</p>
+                <Link href="/add">
+                  <Button variant="link" className="text-[var(--accent)] mt-2">
+                    Dodaj pierwszy posilek
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {meals.map((meal) => (
+                  <MealCard key={meal.id} meal={meal} onDelete={handleDelete} onUpdate={handleUpdate} />
+                ))}
+              </div>
+            )}
+          </motion.div>
+        </motion.div>
+      )}
     </div>
   );
 }

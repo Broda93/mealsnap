@@ -1,26 +1,253 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-jakarta);
   --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* ============================
+   WARM NATURAL PALETTE - LIGHT
+   ============================ */
+
+:root {
+  --radius: 0.625rem;
+
+  /* Warm palette tokens */
+  --bg: #F7F5F0;
+  --surface: #FFFFFF;
+  --text: #1C1B18;
+  --text-secondary: #6B6860;
+  --warm-border: #E8E4DC;
+
+  --protein: #5A8F6B;
+  --protein-soft: #DCF0E2;
+  --fat: #C49A52;
+  --fat-soft: #F5EACD;
+  --carbs: #5B84A8;
+  --carbs-soft: #D4E5F2;
+  --kcal: #B86E4A;
+  --kcal-soft: #F2DFD3;
+  --accent: #5A8F6B;
+  --accent-deep: #3D7050;
+
+  --good: #5A8F6B;
+  --good-bg: #DCF0E2;
+  --mid: #B89B42;
+  --mid-bg: #F2ECCE;
+  --bad: #B85B4A;
+  --bad-bg: #F2D8D3;
+  --fast: #7E6DAD;
+  --fast-bg: #E5E0F2;
+  --streak: #C49A52;
+
+  /* shadcn tokens mapped to warm palette */
+  --background: #F7F5F0;
+  --foreground: #1C1B18;
+  --card: #FFFFFF;
+  --card-foreground: #1C1B18;
+  --popover: #FFFFFF;
+  --popover-foreground: #1C1B18;
+  --primary: #5A8F6B;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F0EDE6;
+  --secondary-foreground: #1C1B18;
+  --muted: #F0EDE6;
+  --muted-foreground: #6B6860;
+  --accent: #5A8F6B;
+  --accent-foreground: #FFFFFF;
+  --destructive: #C45B4A;
+  --border: #E8E4DC;
+  --input: #E8E4DC;
+  --ring: #5A8F6B;
+
+  --chart-1: #5A8F6B;
+  --chart-2: #5B84A8;
+  --chart-3: #C49A52;
+  --chart-4: #B86E4A;
+  --chart-5: #3D7050;
+
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #1C1B18;
+  --sidebar-primary: #5A8F6B;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #F0EDE6;
+  --sidebar-accent-foreground: #1C1B18;
+  --sidebar-border: #E8E4DC;
+  --sidebar-ring: #5A8F6B;
+}
+
+/* ============================
+   WARM NATURAL PALETTE - DARK
+   ============================ */
+
+.dark {
+  --bg: #141310;
+  --surface: #1F1E1A;
+  --text: #E8E4DC;
+  --text-secondary: #9C9788;
+  --warm-border: #2E2C26;
+
+  --protein: #6FAE82;
+  --protein-soft: #1A2E20;
+  --fat: #D4AD60;
+  --fat-soft: #2E2618;
+  --carbs: #6D9BBF;
+  --carbs-soft: #1A2430;
+  --kcal: #D08060;
+  --kcal-soft: #2E1E16;
+  --accent: #6FAE82;
+  --accent-deep: #5A9A6E;
+
+  --good: #6FAE82;
+  --good-bg: #1A2E20;
+  --mid: #C8A84A;
+  --mid-bg: #2E2816;
+  --bad: #CC6B5A;
+  --bad-bg: #2E1A16;
+  --fast: #9688C4;
+  --fast-bg: #201E2E;
+  --streak: #D4AD60;
+
+  --background: #141310;
+  --foreground: #E8E4DC;
+  --card: #1F1E1A;
+  --card-foreground: #E8E4DC;
+  --popover: #1F1E1A;
+  --popover-foreground: #E8E4DC;
+  --primary: #6FAE82;
+  --primary-foreground: #141310;
+  --secondary: #2A2822;
+  --secondary-foreground: #E8E4DC;
+  --muted: #2A2822;
+  --muted-foreground: #9C9788;
+  --accent: #6FAE82;
+  --accent-foreground: #141310;
+  --destructive: #D06050;
+  --border: #2E2C26;
+  --input: #2E2C26;
+  --ring: #6FAE82;
+
+  --chart-1: #6FAE82;
+  --chart-2: #6D9BBF;
+  --chart-3: #D4AD60;
+  --chart-4: #D08060;
+  --chart-5: #5A9A6E;
+
+  --sidebar: #1F1E1A;
+  --sidebar-foreground: #E8E4DC;
+  --sidebar-primary: #6FAE82;
+  --sidebar-primary-foreground: #141310;
+  --sidebar-accent: #2A2822;
+  --sidebar-accent-foreground: #E8E4DC;
+  --sidebar-border: #2E2C26;
+  --sidebar-ring: #6FAE82;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+    transition: background-color 0.4s ease, color 0.4s ease;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ============================
+   WARM CARD - replaces glass/bento
+   ============================ */
+
+.warm-card {
+  background-color: var(--surface);
+  border-radius: 1rem;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.06),
+    0 4px 16px rgba(0, 0, 0, 0.04);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dark .warm-card {
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.2),
+    0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.warm-card:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.08),
+    0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+.dark .warm-card:hover {
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.3),
+    0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+/* ============================
+   GRADIENT TEXT - warm remap
+   ============================ */
+
+.gradient-text {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* ============================
+   SHIMMER - for skeletons
+   ============================ */
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent, var(--warm-border), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s ease-in-out infinite;
 }

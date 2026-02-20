@@ -1,0 +1,342 @@
+{
+  "name": "📡 AI Trend Monitor — Tygodniowy Raport",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8,
+              "triggerAtDay": 7
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "⏰ Niedziela 8:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://blog.n8n.io/rss/"
+      },
+      "id": "rss-n8n",
+      "name": "📰 n8n Blog",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [300, 0],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://www.anthropic.com/feed.xml"
+      },
+      "id": "rss-anthropic",
+      "name": "📰 Anthropic",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [300, 120],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://openai.com/blog/rss.xml"
+      },
+      "id": "rss-openai",
+      "name": "📰 OpenAI",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [300, 240],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://techcrunch.com/category/artificial-intelligence/feed/"
+      },
+      "id": "rss-techcrunch",
+      "name": "📰 TechCrunch AI",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [300, 360],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://www.reddit.com/r/n8n/.rss"
+      },
+      "id": "rss-reddit-n8n",
+      "name": "📰 r/n8n",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [300, 480],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://www.reddit.com/r/artificial/.rss"
+      },
+      "id": "rss-reddit-ai",
+      "name": "📰 r/artificial",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [300, 600],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://github.com/n8n-io/n8n/releases.atom"
+      },
+      "id": "rss-github-n8n",
+      "name": "📰 n8n Releases",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [300, 720],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "https://hnrss.org/newest?q=MCP+OR+%22AI+agent%22+OR+n8n+OR+%22model+context+protocol%22&count=20"
+      },
+      "id": "rss-hn",
+      "name": "📰 Hacker News AI",
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.1,
+      "position": [300, 840],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "append",
+        "options": {}
+      },
+      "id": "merge-all",
+      "name": "🔀 Połącz wszystko",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [600, 360]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filtruj artykuły z ostatnich 7 dni i formatuj\nconst now = new Date();\nconst weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);\n\nconst articles = [];\nconst seen = new Set();\n\nfor (const item of $input.all()) {\n  const data = item.json;\n  \n  // Próbuj znaleźć datę w różnych polach\n  const dateStr = data.isoDate || data.pubDate || data.date || data['dc:date'] || '';\n  const articleDate = new Date(dateStr);\n  \n  // Próbuj znaleźć tytuł\n  const title = data.title || data.name || 'Brak tytułu';\n  \n  // Deduplikacja po tytule\n  const titleLower = title.toLowerCase().trim();\n  if (seen.has(titleLower)) continue;\n  seen.add(titleLower);\n  \n  // Filtruj tylko z ostatnich 7 dni (jeśli brak daty, przepuść)\n  if (dateStr && articleDate < weekAgo) continue;\n  \n  // Wyciągnij treść\n  const content = data.contentSnippet || data.content || data.description || data.summary || '';\n  // Ogranicz długość treści\n  const shortContent = content.substring(0, 500).replace(/<[^>]*>/g, '');\n  \n  // Źródło z linku\n  const link = data.link || data.url || data.guid || '';\n  let source = 'Nieznane';\n  if (link.includes('n8n.io')) source = 'n8n';\n  else if (link.includes('anthropic.com')) source = 'Anthropic';\n  else if (link.includes('openai.com')) source = 'OpenAI';\n  else if (link.includes('techcrunch.com')) source = 'TechCrunch';\n  else if (link.includes('reddit.com/r/n8n')) source = 'r/n8n';\n  else if (link.includes('reddit.com/r/artificial')) source = 'r/artificial';\n  else if (link.includes('github.com')) source = 'GitHub';\n  else if (link.includes('ycombinator') || link.includes('hnrss')) source = 'Hacker News';\n  \n  articles.push({\n    title: title,\n    source: source,\n    date: dateStr ? articleDate.toISOString().split('T')[0] : 'brak daty',\n    link: link,\n    content: shortContent\n  });\n}\n\n// Sortuj od najnowszych\narticles.sort((a, b) => {\n  if (a.date === 'brak daty') return 1;\n  if (b.date === 'brak daty') return -1;\n  return new Date(b.date) - new Date(a.date);\n});\n\n// Ogranicz do 50 najnowszych\nconst topArticles = articles.slice(0, 50);\n\n// Przygotuj tekst do AI\nlet articleText = '';\nfor (const a of topArticles) {\n  articleText += `[${a.source}] ${a.date} — ${a.title}\\n${a.content}\\nLink: ${a.link}\\n\\n`;\n}\n\nreturn [{\n  json: {\n    articleCount: topArticles.length,\n    articlesForAI: articleText,\n    articles: topArticles,\n    generatedAt: now.toISOString()\n  }\n}];"
+      },
+      "id": "code-filter",
+      "name": "⚙️ Filtruj 7 dni + deduplikuj",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 360]
+    },
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-5-20250514",
+        "messages": {
+          "values": [
+            {
+              "role": "user",
+              "content": "=Jesteś analitykiem trendów AI i automatyzacji. Przygotowujesz tygodniowy raport dla polskiego konsultanta automatyzacji AI, który specjalizuje się w n8n, MCP (Model Context Protocol), i budowaniu agentów AI.\n\nOto artykuły z tego tygodnia ({{ $json.articleCount }} artykułów):\n\n{{ $json.articlesForAI }}\n\n---\n\nPrzygotuj raport po POLSKU w następującym formacie:\n\n# 📡 Tygodniowy Raport AI — [data tygodnia]\n\n## 🔴 KRYTYCZNE (wymagają natychmiastowej reakcji)\n[Luki bezpieczeństwa, breaking changes, deprecacje]\n\n## 🟢 WAŻNE NOWOŚCI\nDla każdej nowości podaj:\n- **Co:** [1 zdanie]\n- **Dlaczego ważne:** [wpływ na automatyzację/n8n/MCP]\n- **Co zrobić:** [konkretna akcja lub \"obserwuj\"]\n\n## 🟡 WARTE UWAGI\n[Krótsze opisy mniej pilnych trendów]\n\n## 📊 NOWE MODELE / CENY API\n[Tabela jeśli pojawiły się nowe modele lub zmiany cen]\n\n## 💡 POMYSŁ NA CONTENT\n[1-2 pomysły na post LinkedIn lub tutorial bazujący na trendach tygodnia]\n\n## 📋 AKTUALIZACJA ROADMAPY\n[Co dodać/usunąć/przesunąć w planie nauki]\n\nBądź konkretny i praktyczny. Nie powtarzaj informacji. Skup się na tym co NAPRAWDĘ istotne dla konsultanta automatyzacji AI w Polsce."
+            }
+          ]
+        },
+        "options": {
+          "maxTokens": 4000,
+          "temperature": 0.3
+        }
+      },
+      "id": "ai-summarize",
+      "name": "🤖 Claude — Podsumowanie",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [1150, 360],
+      "credentials": {
+        "anthropicApi": {
+          "id": "TWOJE_CREDENTIALS_ID",
+          "name": "Anthropic API"
+        }
+      },
+      "notes": "⚠️ KONFIGURACJA: Podmień credentials na swoje Anthropic API key. Możesz też użyć OpenAI — zamień node na 'OpenAI Chat Model' i model na 'gpt-4o'."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Przygotuj dane do Notion i Email\nconst aiResponse = $input.first().json;\n\n// Wyciągnij treść odpowiedzi AI\nlet report = '';\nif (aiResponse.message && aiResponse.message.content) {\n  report = aiResponse.message.content;\n} else if (aiResponse.text) {\n  report = aiResponse.text;\n} else if (typeof aiResponse === 'string') {\n  report = aiResponse;\n} else {\n  // Fallback — szukaj w dowolnym polu\n  report = JSON.stringify(aiResponse);\n}\n\nconst now = new Date();\nconst weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);\n\nconst formatDate = (d) => d.toISOString().split('T')[0];\n\nconst title = `📡 AI Weekly — ${formatDate(weekStart)} do ${formatDate(now)}`;\n\nreturn [{\n  json: {\n    title: title,\n    report: report,\n    date: formatDate(now),\n    weekRange: `${formatDate(weekStart)} — ${formatDate(now)}`\n  }\n}];"
+      },
+      "id": "code-format",
+      "name": "⚙️ Formatuj raport",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 360]
+    },
+    {
+      "parameters": {
+        "sendTo": "TWOJ_EMAIL@gmail.com",
+        "subject": "={{ $json.title }}",
+        "message": "={{ $json.report }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "email-send",
+      "name": "📧 Wyślij Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1750, 240],
+      "credentials": {
+        "smtp": {
+          "id": "TWOJE_SMTP_ID",
+          "name": "Gmail SMTP"
+        }
+      },
+      "notes": "⚠️ KONFIGURACJA: Ustaw SMTP credentials (Gmail: smtp.gmail.com, port 465, SSL). Wpisz swój email w polu 'sendTo'."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/pages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "notionApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"parent\": {\n    \"page_id\": \"TWOJE_NOTION_PAGE_ID\"\n  },\n  \"properties\": {\n    \"title\": {\n      \"title\": [\n        {\n          \"text\": {\n            \"content\": \"{{ $json.title }}\"\n          }\n        }\n      ]\n    }\n  },\n  \"children\": [\n    {\n      \"object\": \"block\",\n      \"type\": \"paragraph\",\n      \"paragraph\": {\n        \"rich_text\": [\n          {\n            \"type\": \"text\",\n            \"text\": {\n              \"content\": {{ JSON.stringify($json.report.substring(0, 2000)) }}\n            }\n          }\n        ]\n      }\n    }\n  ]\n}"
+      },
+      "id": "notion-create",
+      "name": "📝 Zapisz w Notion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1750, 480],
+      "credentials": {
+        "notionApi": {
+          "id": "TWOJE_NOTION_CREDS",
+          "name": "Notion API"
+        }
+      },
+      "notes": "⚠️ KONFIGURACJA: 1) Stwórz Notion Integration na notion.so/my-integrations. 2) Dodaj credentials w n8n. 3) Wpisz page_id strony '📡 System śledzenia trendów AI'. 4) Udostępnij stronę integracji w Notion."
+    },
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "▶️ Test ręczny",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 500],
+      "notes": "Użyj tego przycisku do testowania workflow bez czekania na niedzielę."
+    }
+  ],
+  "connections": {
+    "⏰ Niedziela 8:00": {
+      "main": [
+        [
+          { "node": "📰 n8n Blog", "type": "main", "index": 0 },
+          { "node": "📰 Anthropic", "type": "main", "index": 0 },
+          { "node": "📰 OpenAI", "type": "main", "index": 0 },
+          { "node": "📰 TechCrunch AI", "type": "main", "index": 0 },
+          { "node": "📰 r/n8n", "type": "main", "index": 0 },
+          { "node": "📰 r/artificial", "type": "main", "index": 0 },
+          { "node": "📰 n8n Releases", "type": "main", "index": 0 },
+          { "node": "📰 Hacker News AI", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "📰 n8n Blog": {
+      "main": [
+        [{ "node": "🔀 Połącz wszystko", "type": "main", "index": 0 }]
+      ]
+    },
+    "📰 Anthropic": {
+      "main": [
+        [{ "node": "🔀 Połącz wszystko", "type": "main", "index": 0 }]
+      ]
+    },
+    "📰 OpenAI": {
+      "main": [
+        [{ "node": "🔀 Połącz wszystko", "type": "main", "index": 0 }]
+      ]
+    },
+    "📰 TechCrunch AI": {
+      "main": [
+        [{ "node": "🔀 Połącz wszystko", "type": "main", "index": 0 }]
+      ]
+    },
+    "📰 r/n8n": {
+      "main": [
+        [{ "node": "🔀 Połącz wszystko", "type": "main", "index": 0 }]
+      ]
+    },
+    "📰 r/artificial": {
+      "main": [
+        [{ "node": "🔀 Połącz wszystko", "type": "main", "index": 0 }]
+      ]
+    },
+    "📰 n8n Releases": {
+      "main": [
+        [{ "node": "🔀 Połącz wszystko", "type": "main", "index": 0 }]
+      ]
+    },
+    "📰 Hacker News AI": {
+      "main": [
+        [{ "node": "🔀 Połącz wszystko", "type": "main", "index": 0 }]
+      ]
+    },
+    "🔀 Połącz wszystko": {
+      "main": [
+        [{ "node": "⚙️ Filtruj 7 dni + deduplikuj", "type": "main", "index": 0 }]
+      ]
+    },
+    "⚙️ Filtruj 7 dni + deduplikuj": {
+      "main": [
+        [{ "node": "🤖 Claude — Podsumowanie", "type": "main", "index": 0 }]
+      ]
+    },
+    "🤖 Claude — Podsumowanie": {
+      "main": [
+        [{ "node": "⚙️ Formatuj raport", "type": "main", "index": 0 }]
+      ]
+    },
+    "⚙️ Formatuj raport": {
+      "main": [
+        [
+          { "node": "📧 Wyślij Email", "type": "main", "index": 0 },
+          { "node": "📝 Zapisz w Notion", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "▶️ Test ręczny": {
+      "main": [
+        [
+          { "node": "📰 n8n Blog", "type": "main", "index": 0 },
+          { "node": "📰 Anthropic", "type": "main", "index": 0 },
+          { "node": "📰 OpenAI", "type": "main", "index": 0 },
+          { "node": "📰 TechCrunch AI", "type": "main", "index": 0 },
+          { "node": "📰 r/n8n", "type": "main", "index": 0 },
+          { "node": "📰 r/artificial", "type": "main", "index": 0 },
+          { "node": "📰 n8n Releases", "type": "main", "index": 0 },
+          { "node": "📰 Hacker News AI", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "AI Monitoring"
+    },
+    {
+      "name": "Portfolio"
+    }
+  ],
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "ai-trend-monitor-v1"
+  }
+}
