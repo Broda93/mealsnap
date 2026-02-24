@@ -63,7 +63,6 @@ export async function POST(request: NextRequest) {
       fat_g,
       fiber_g,
       confidence,
-      note,
       in_if_window,
       image_base64,
       image_mime,
@@ -95,7 +94,8 @@ export async function POST(request: NextRequest) {
         });
 
       if (uploadError) {
-        console.error("Upload error:", uploadError);
+        console.error("Upload error:", JSON.stringify(uploadError));
+        return NextResponse.json({ error: `Upload error: ${uploadError.message}` }, { status: 500 });
       } else {
         const { data: urlData } = supabase.storage
           .from("meal-images")
@@ -117,7 +117,6 @@ export async function POST(request: NextRequest) {
         fat_g,
         fiber_g,
         confidence,
-        note: note || null,
         in_if_window: in_if_window ?? true,
         image_url,
         eaten_at: new Date().toISOString(),
@@ -126,8 +125,8 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error("Insert error:", error);
-      return NextResponse.json({ error: "Blad zapisu posilku" }, { status: 500 });
+      console.error("Insert error:", JSON.stringify(error));
+      return NextResponse.json({ error: `Blad zapisu: ${error.message} (${error.code})` }, { status: 500 });
     }
 
     return NextResponse.json(data, { status: 201 });

@@ -55,7 +55,22 @@ export function QuickAdd() {
         }),
       });
       if (!res.ok) throw new Error();
+      const savedMeal = await res.json();
       toast.success(`${template.name} dodany!`);
+
+      // Auto-score w tle
+      fetch("/api/meals/score", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mealId: savedMeal.id }),
+      })
+        .then((r) => r.ok ? r.json() : null)
+        .then((scored) => {
+          if (scored?.score != null) {
+            toast.success(`Ocena AI: ${scored.score}/10`, { icon: "✨" });
+          }
+        })
+        .catch(() => {});
     } catch {
       toast.error("Blad dodawania posilku");
     } finally {

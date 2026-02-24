@@ -147,6 +147,28 @@ export function getMacroPercentages(proteinG: number, carbsG: number, fatG: numb
   };
 }
 
+// Macro targets based on calorie goal and diet goal
+// lose: 30% protein, 40% carbs, 30% fat
+// maintain: 25% protein, 45% carbs, 30% fat
+// gain: 25% protein, 50% carbs, 25% fat
+export function getMacroTargets(calorieTarget: number, goal: Profile["goal"]): {
+  proteinTarget: number;
+  carbsTarget: number;
+  fatTarget: number;
+} {
+  const splits: Record<Profile["goal"], { p: number; c: number; f: number }> = {
+    lose: { p: 0.30, c: 0.40, f: 0.30 },
+    maintain: { p: 0.25, c: 0.45, f: 0.30 },
+    gain: { p: 0.25, c: 0.50, f: 0.25 },
+  };
+  const s = splits[goal];
+  return {
+    proteinTarget: Math.round((calorieTarget * s.p) / 4),
+    carbsTarget: Math.round((calorieTarget * s.c) / 4),
+    fatTarget: Math.round((calorieTarget * s.f) / 9),
+  };
+}
+
 export function getWeekDates(referenceDate: Date = new Date()): string[] {
   const dates: string[] = [];
   const day = referenceDate.getDay();

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Trash2, Edit3, Save, X, MessageSquare, AlertTriangle, ChevronDown, Sparkles } from "lucide-react";
+import { Trash2, Edit3, Save, X, MessageSquare, AlertTriangle, ChevronDown, Sparkles, Loader2, RotateCcw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,9 +34,11 @@ export function MealCard({ meal, onDelete, onUpdate }: MealCardProps) {
   const [confirming, setConfirming] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [rescoring, setRescoring] = useState(false);
   const [commentOpen, setCommentOpen] = useState(false);
   const [editData, setEditData] = useState({
     name: meal.name,
+    description: meal.description || "",
     calories: meal.calories,
     protein_g: meal.protein_g,
     carbs_g: meal.carbs_g,
@@ -49,24 +51,29 @@ export function MealCard({ meal, onDelete, onUpdate }: MealCardProps) {
     minute: "2-digit",
   });
 
+  const saveChanges = async () => {
+    const res = await fetch("/api/meals", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: meal.id,
+        name: editData.name,
+        description: editData.description || null,
+        calories: editData.calories,
+        protein_g: editData.protein_g,
+        carbs_g: editData.carbs_g,
+        fat_g: editData.fat_g,
+        note: editData.note || null,
+      }),
+    });
+    if (!res.ok) throw new Error();
+    return await res.json();
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
-      const res = await fetch("/api/meals", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: meal.id,
-          name: editData.name,
-          calories: editData.calories,
-          protein_g: editData.protein_g,
-          carbs_g: editData.carbs_g,
-          fat_g: editData.fat_g,
-          note: editData.note || null,
-        }),
-      });
-      if (!res.ok) throw new Error();
-      const updated = await res.json();
+      const updated = await saveChanges();
       onUpdate?.(updated);
       setEditing(false);
       toast.success("Posilek zaktualizowany");
@@ -77,9 +84,31 @@ export function MealCard({ meal, onDelete, onUpdate }: MealCardProps) {
     }
   };
 
+  const handleSaveAndRescore = async () => {
+    setRescoring(true);
+    try {
+      await saveChanges();
+      const scoreRes = await fetch("/api/meals/score", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mealId: meal.id }),
+      });
+      if (!scoreRes.ok) throw new Error();
+      const scored = await scoreRes.json();
+      onUpdate?.(scored);
+      setEditing(false);
+      toast.success(`Nowa ocena AI: ${scored.score}/10`, { icon: "✨" });
+    } catch {
+      toast.error("Blad ponownej oceny");
+    } finally {
+      setRescoring(false);
+    }
+  };
+
   const startEdit = () => {
     setEditData({
       name: meal.name,
+      description: meal.description || "",
       calories: meal.calories,
       protein_g: meal.protein_g,
       carbs_g: meal.carbs_g,
@@ -288,6 +317,12 @@ export function MealCard({ meal, onDelete, onUpdate }: MealCardProps) {
                   />
                 </div>
                 <Input
+                  value={editData.description}
+                  onChange={(e) => setEditData({ ...editData, description: e.target.value })}
+                  placeholder="Opis (np. skladniki, porcja)"
+                  className="h-8 text-sm rounded-lg"
+                />
+                <Input
                   value={editData.note}
                   onChange={(e) => setEditData({ ...editData, note: e.target.value })}
                   placeholder="Notatka (np. po treningu)"
@@ -298,19 +333,33 @@ export function MealCard({ meal, onDelete, onUpdate }: MealCardProps) {
                     size="sm"
                     className="flex-1 h-7 text-xs bg-[var(--accent)] hover:bg-[var(--accent-deep)] text-white rounded-lg"
                     onClick={handleSave}
-                    disabled={saving}
+                    disabled={saving || rescoring}
                   >
                     <Save className="h-3 w-3 mr-1" />
                     {saving ? "..." : "Zapisz"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="flex-1 h-7 text-xs rounded-lg"
+                    style={{ backgroundColor: "var(--good-bg)", color: "var(--good)" }}
+                    onClick={handleSaveAndRescore}
+                    disabled={saving || rescoring}
+                  >
+                    {rescoring ? (
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3 w-3 mr-1" />
+                    )}
+                    {rescoring ? "Oceniam..." : "Ocen AI"}
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
                     className="h-7 text-xs rounded-lg"
                     onClick={() => setEditing(false)}
+                    disabled={rescoring}
                   >
-                    <X className="h-3 w-3 mr-1" />
-                    Anuluj
+                    <X className="h-3 w-3" />
                   </Button>
                 </div>
               </motion.div>

@@ -12,6 +12,7 @@ import { MacroRing } from "@/components/macro-ring";
 import { BodyFatCard } from "@/components/body-fat-card";
 import { DietTypeCard } from "@/components/diet-type-card";
 import { IFTimer } from "@/components/if-timer";
+import { SmartSuggestion } from "@/components/smart-suggestion";
 import { DashboardSkeleton } from "@/components/skeletons";
 import { useAuth } from "@/lib/auth-context";
 import type { Meal } from "@/lib/types";
@@ -150,6 +151,21 @@ export default function Dashboard() {
               </motion.div>
             )}
           </div>
+
+          {/* Smart suggestion */}
+          {meals.length > 0 && profile && (
+            <motion.div variants={fadeUp}>
+              <SmartSuggestion
+                totalCalories={totalCalories}
+                totalProtein={totalProtein}
+                totalCarbs={totalCarbs}
+                totalFat={totalFat}
+                calorieTarget={calorieTarget}
+                profile={profile}
+                mealCount={meals.length}
+              />
+            </motion.div>
+          )}
 
           {/* Meals section */}
           <motion.div variants={fadeUp} className="space-y-3">
