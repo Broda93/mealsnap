@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import { toast } from "sonner";
-import { Camera, Upload, X, Loader2, Check, Edit3, Bookmark, ImageIcon } from "lucide-react";
+import { Camera, Upload, X, Loader2, Check, Edit3, Bookmark, ImageIcon, UtensilsCrossed, ShoppingBasket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,6 +37,7 @@ export function CameraCapture() {
   const [ifWarningOpen, setIfWarningOpen] = useState(false);
   const [scoring, setScoring] = useState(false);
   const [mealScore, setMealScore] = useState<{ score: number; comment: string } | null>(null);
+  const [photoMode, setPhotoMode] = useState<"meal" | "products">("meal");
   const fileRef = useRef<HTMLInputElement>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
 
@@ -92,7 +93,7 @@ export function CameraCapture() {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: base64, mimeType }),
+        body: JSON.stringify({ image: base64, mimeType, photoMode }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Analiza nie powiodla sie");
@@ -202,6 +203,7 @@ export function CameraCapture() {
     setTemplateSaved(false);
     setScoring(false);
     setMealScore(null);
+    setPhotoMode("meal");
     if (fileRef.current) fileRef.current.value = "";
     if (galleryRef.current) galleryRef.current.value = "";
   };
@@ -308,6 +310,41 @@ export function CameraCapture() {
                 </Button>
               </div>
               <div className="p-4 space-y-4">
+                {/* Photo mode selector */}
+                <div className="space-y-2">
+                  <Label>Co jest na zdjeciu?</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setPhotoMode("meal")}
+                      className="flex items-center gap-2 p-3 rounded-xl border-2 transition-all text-left"
+                      style={{
+                        borderColor: photoMode === "meal" ? "var(--accent)" : "var(--warm-border)",
+                        backgroundColor: photoMode === "meal" ? "var(--protein-soft)" : "transparent",
+                      }}
+                    >
+                      <UtensilsCrossed className="h-4 w-4 flex-shrink-0" style={{ color: photoMode === "meal" ? "var(--accent)" : "var(--text-secondary)" }} />
+                      <div>
+                        <p className="text-sm font-medium">Gotowy posilek</p>
+                        <p className="text-[10px] text-[var(--text-secondary)]">Danie na talerzu</p>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => setPhotoMode("products")}
+                      className="flex items-center gap-2 p-3 rounded-xl border-2 transition-all text-left"
+                      style={{
+                        borderColor: photoMode === "products" ? "var(--accent)" : "var(--warm-border)",
+                        backgroundColor: photoMode === "products" ? "var(--protein-soft)" : "transparent",
+                      }}
+                    >
+                      <ShoppingBasket className="h-4 w-4 flex-shrink-0" style={{ color: photoMode === "products" ? "var(--accent)" : "var(--text-secondary)" }} />
+                      <div>
+                        <p className="text-sm font-medium">Produkty</p>
+                        <p className="text-[10px] text-[var(--text-secondary)]">Surowe skladniki</p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <Label>Typ posilku</Label>
                   <Select
@@ -337,7 +374,7 @@ export function CameraCapture() {
                       Analizuje...
                     </>
                   ) : (
-                    "Analizuj z AI"
+                    <>Analizuj z AI</>
                   )}
                 </Button>
               </div>

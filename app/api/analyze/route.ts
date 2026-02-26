@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Nie zalogowany" }, { status: 401 });
     }
 
-    const { image, mimeType } = await request.json();
+    const { image, mimeType, photoMode } = await request.json();
 
     if (!image || !mimeType) {
       return NextResponse.json(
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const analysis = await analyzeMealImage(image, mimeType, user.id, supabase);
+    const analysis = await analyzeMealImage(image, mimeType, user.id, supabase, photoMode || "meal");
     return NextResponse.json(analysis);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: "Blad analizy zdjecia" },
+      { error: message || "Blad analizy zdjecia" },
       { status: 500 }
     );
   }

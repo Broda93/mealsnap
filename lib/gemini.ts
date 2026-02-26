@@ -3,32 +3,73 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase as anonSupabase } from "./supabase";
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY!;
-const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "anthropic/claude-opus-4-6";
+const OPENROUTER_MODEL = process.env.OPENROUTER_VISION_MODEL || "google/gemini-2.0-flash-001";
 const API_COST_LIMIT = parseFloat(process.env.API_COST_LIMIT || "2.00");
 
-// Opus pricing per token (OpenRouter)
-const INPUT_COST_PER_TOKEN = 15 / 1_000_000;   // $15/M
-const OUTPUT_COST_PER_TOKEN = 75 / 1_000_000;   // $75/M
+// Gemini Flash pricing (OpenRouter)
+const INPUT_COST_PER_TOKEN = 0.1 / 1_000_000;   // $0.10/M
+const OUTPUT_COST_PER_TOKEN = 0.4 / 1_000_000;   // $0.40/M
 
-const ANALYSIS_PROMPT = `Jestes ekspertem od zywienia. Przeanalizuj zdjecie posilku i zwroc dokladna analize w formacie JSON.
+const ANALYSIS_PROMPT_MEAL = `Jestes ekspertem dietetykiem z 15-letnim doswiadczeniem. Przeanalizuj zdjecie GOTOWEGO POSILKU i zwroc dokladna analize w formacie JSON.
 
 Odpowiedz WYLACZNIE poprawnym JSON (bez markdown, bez backtickow):
 {
   "name": "Nazwa posilku po polsku",
   "description": "Krotki opis skladnikow po polsku (1-2 zdania)",
   "calories": <liczba calkowita - szacowane kcal>,
-  "protein_g": <liczba - bialko w gramach>,
-  "carbs_g": <liczba - weglowodany w gramach>,
-  "fat_g": <liczba - tluszcz w gramach>,
-  "fiber_g": <liczba - blonnik w gramach>,
-  "confidence": "<low|medium|high> - pewnosc oszacowania"
+  "protein_g": <liczba z dokladnoscia do 1 miejsca po przecinku>,
+  "carbs_g": <liczba z dokladnoscia do 1 miejsca po przecinku>,
+  "fat_g": <liczba z dokladnoscia do 1 miejsca po przecinku>,
+  "fiber_g": <liczba z dokladnoscia do 1 miejsca po przecinku>,
+  "confidence": "<low|medium|high>"
 }
 
-Zasady:
-- Szacuj porcje na podstawie rozmiaru talerza/naczynia
-- Podawaj realistyczne wartosci odzywieniowe
+KRYTYCZNE zasady szacowania BIALKA:
+- Piersi kurczaka: ~31g bialka / 100g (surowej), po obrobce ~100-120g gotowej = 31-37g bialka
+- Jajko: 6-7g bialka / sztuke
+- Ryz bialy gotowany: ~2.7g bialka / 100g
+- Twarog pollusty: ~18g bialka / 100g
+- Losos: ~20g bialka / 100g
+- Chleb: ~8g bialka / 100g
+- Jogurt grecki: ~10g bialka / 100g
+- Tofu: ~8g bialka / 100g
+- ZAWSZE szacuj wage kazdego skladnika osobno, potem sumuj bialko
+
+Pozostale zasady:
+- Szacuj porcje na podstawie rozmiaru talerza/naczynia (standard 26cm)
+- Podawaj realistyczne wartosci - lepiej niedoszacowac niz przeszacowac
 - Confidence: high = typowy posilek latwy do rozpoznania, medium = trudniejszy, low = niejasne zdjecie
-- Jesli nie mozesz rozpoznac jedzenia, zwroc confidence: "low" i najlepsze przyblizone wartosci`;
+- Jesli nie mozesz rozpoznac jedzenia, zwroc confidence: "low"`;
+
+const ANALYSIS_PROMPT_PRODUCTS = `Jestes ekspertem dietetykiem z 15-letnim doswiadczeniem. Na zdjeciu widac SUROWE PRODUKTY / SKLADNIKI (nie gotowy posilek). Oszacuj wartosci odzywcze posilku ktory z nich powstanie.
+
+Odpowiedz WYLACZNIE poprawnym JSON (bez markdown, bez backtickow):
+{
+  "name": "Nazwa posilku ktory powstanie z tych produktow, po polsku",
+  "description": "Lista rozpoznanych produktow z szacowanymi wagami (np. piersi kurczaka ~200g, ryz ~80g suchego)",
+  "calories": <liczba calkowita - szacowane kcal GOTOWEGO posilku>,
+  "protein_g": <liczba z dokladnoscia do 1 miejsca po przecinku>,
+  "carbs_g": <liczba z dokladnoscia do 1 miejsca po przecinku>,
+  "fat_g": <liczba z dokladnoscia do 1 miejsca po przecinku>,
+  "fiber_g": <liczba z dokladnoscia do 1 miejsca po przecinku>,
+  "confidence": "<low|medium|high>"
+}
+
+KRYTYCZNE zasady:
+- Rozpoznaj kazdy produkt osobno i oszacuj jego wage
+- Podaj wartosci dla GOTOWEGO posilku (po obrobce termicznej)
+- Ryz/makaron suchy: x2.5-3 wagi po ugotowaniu
+- Mieso traci ~25% wagi po obrobce
+- Bialko szacuj na podstawie wagi KAZDEGO produktu osobno:
+  * Piersi kurczaka surowe: ~23g bialka / 100g
+  * Jajko: 6-7g / szt
+  * Ryz suchy: ~7g / 100g
+  * Chleb: ~8g / 100g
+- ZAWSZE wymien produkty i ich wagi w opisie
+- Confidence: high = produkty dobrze widoczne, medium = czesciowo widoczne, low = trudne do rozpoznania`;
+
+// Keep backward compatibility
+const ANALYSIS_PROMPT = ANALYSIS_PROMPT_MEAL;
 
 export async function checkCostLimit(profileId: string, sb?: SupabaseClient): Promise<{ allowed: boolean; used: number; limit: number }> {
   const client = sb || anonSupabase;
@@ -60,17 +101,22 @@ async function addCost(profileId: string, cost: number, sb?: SupabaseClient) {
     .eq("id", profileId);
 }
 
+export type PhotoMode = "meal" | "products";
+
 export async function analyzeMealImage(
   base64Image: string,
   mimeType: string,
   profileId: string,
-  sb?: SupabaseClient
+  sb?: SupabaseClient,
+  photoMode: PhotoMode = "meal"
 ): Promise<MealAnalysis> {
   // Check cost limit
   const { allowed, used, limit } = await checkCostLimit(profileId, sb);
   if (!allowed) {
     throw new Error(`COST_LIMIT|Przekroczono limit kosztow API ($${used.toFixed(2)} / $${limit.toFixed(2)})`);
   }
+
+  const prompt = photoMode === "products" ? ANALYSIS_PROMPT_PRODUCTS : ANALYSIS_PROMPT_MEAL;
 
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
@@ -84,7 +130,7 @@ export async function analyzeMealImage(
         {
           role: "user",
           content: [
-            { type: "text", text: ANALYSIS_PROMPT },
+            { type: "text", text: prompt },
             {
               type: "image_url",
               image_url: {
@@ -100,14 +146,20 @@ export async function analyzeMealImage(
 
   if (!response.ok) {
     const err = await response.text();
-    console.error("OpenRouter error:", err);
-    throw new Error(`OpenRouter API error: ${response.status}`);
+    console.error("OpenRouter vision error:", response.status, err);
+    throw new Error(`Blad API analizy obrazu (${response.status})`);
   }
 
   const data = await response.json();
+
+  if (!data.choices?.[0]?.message?.content) {
+    console.error("OpenRouter empty response:", JSON.stringify(data));
+    throw new Error("Model nie zwrocil odpowiedzi");
+  }
+
   const text = data.choices[0].message.content;
 
-  // Calculate cost from usage
+  // Calculate cost from usage (Gemini Flash pricing)
   const usage = data.usage || {};
   const inputTokens = usage.prompt_tokens || 1500;
   const outputTokens = usage.completion_tokens || 200;
@@ -207,11 +259,17 @@ ODPOWIEDZ WYLACZNIE w formacie JSON (bez markdown, bez backtickow):
 
   if (!response.ok) {
     const err = await response.text();
-    console.error("OpenRouter scoring error:", err);
-    throw new Error(`OpenRouter API error: ${response.status}`);
+    console.error("OpenRouter scoring error:", response.status, err);
+    throw new Error(`Blad API scoringu (${response.status})`);
   }
 
   const data = await response.json();
+
+  if (!data.choices?.[0]?.message?.content) {
+    console.error("OpenRouter scoring empty response:", JSON.stringify(data));
+    throw new Error("Model nie zwrocil odpowiedzi dla scoringu");
+  }
+
   const text = data.choices[0].message.content;
 
   const usage = data.usage || {};
@@ -268,23 +326,12 @@ CELE UZYTKOWNIKA:
 ${input.ifEnabled ? `- Post przerywany: ${input.ifProtocol}, zgodnosc ${input.ifCompliance}%` : "- Post przerywany: nieaktywny"}
 
 INSTRUKCJE:
-1. Przeanalizuj kazdy dzien: kalorie vs cel, rozklad makro, regularnosc posilkow, jakosc skladnikow
-2. Wybierz najlepszy i najgorszy dzien z uzasadnieniem opartym na DANYCH (konkretne liczby)
-3. Napisz 3 rekomendacje - kazda musi zawierac:
-   - Konkretny problem z danymi (np. "W 5/7 dni bialko ponizej 60% celu")
-   - Praktyczne rozwiazanie z przykladem posilku/produktu
-   - Oczekiwany efekt zmiany
-4. Podsumowanie: 2-3 zdania - ogolna ocena tygodnia i najwazniejszy priorytet na kolejny tydzien
+1. Wybierz najlepszy i najgorszy dzien (krotkie uzasadnienie z liczbami)
+2. Napisz 3 krotkie rekomendacje (1 zdanie kazda)
+3. Podsumowanie: 1-2 zdania
 
-STYL: rzeczowy, oparty na danych, bez ogolnikow. Pisz po polsku.
-
-ODPOWIEDZ WYLACZNIE w formacie JSON (bez markdown, bez backtickow):
-{
-  "bestDay": { "date": "YYYY-MM-DD", "score": <sredni score dnia lub 0>, "reason": "<1-2 zdania z konkretnymi liczbami>" },
-  "worstDay": { "date": "YYYY-MM-DD", "score": <sredni score dnia lub 0>, "reason": "<1-2 zdania z konkretnymi liczbami>" },
-  "recommendations": ["<rekomendacja 1>", "<rekomendacja 2>", "<rekomendacja 3>"],
-  "summary": "<2-3 zdania podsumowania>"
-}`;
+STYL: zwiezly, po polsku. ODPOWIEDZ WYLACZNIE JSON (bez markdown):
+{"bestDay":{"date":"YYYY-MM-DD","score":0,"reason":"..."},"worstDay":{"date":"YYYY-MM-DD","score":0,"reason":"..."},"recommendations":["...","...","..."],"summary":"..."}`;
 
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
@@ -295,17 +342,23 @@ ODPOWIEDZ WYLACZNIE w formacie JSON (bez markdown, bez backtickow):
     body: JSON.stringify({
       model: OPENROUTER_MODEL,
       messages: [{ role: "user", content: prompt }],
-      max_tokens: 800,
+      max_tokens: 2000,
     }),
   });
 
   if (!response.ok) {
     const err = await response.text();
-    console.error("OpenRouter report error:", err);
-    throw new Error(`OpenRouter API error: ${response.status}`);
+    console.error("OpenRouter report error:", response.status, err);
+    throw new Error(`Blad API raportu (${response.status})`);
   }
 
   const data = await response.json();
+
+  if (!data.choices?.[0]?.message?.content) {
+    console.error("OpenRouter report empty response:", JSON.stringify(data));
+    throw new Error("Model nie zwrocil odpowiedzi dla raportu");
+  }
+
   const text = data.choices[0].message.content;
 
   const usage = data.usage || {};
@@ -314,6 +367,34 @@ ODPOWIEDZ WYLACZNIE w formacie JSON (bez markdown, bez backtickow):
   const cost = (inputTokens * INPUT_COST_PER_TOKEN) + (outputTokens * OUTPUT_COST_PER_TOKEN);
   await addCost(profileId, cost, sb);
 
-  const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-  return JSON.parse(cleaned) as WeeklyReportData;
+  let cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+
+  // Fix truncated JSON - try to repair if needed
+  try {
+    return JSON.parse(cleaned) as WeeklyReportData;
+  } catch {
+    // Try to fix common truncation issues
+    const openBraces = (cleaned.match(/{/g) || []).length;
+    const closeBraces = (cleaned.match(/}/g) || []).length;
+    const openBrackets = (cleaned.match(/\[/g) || []).length;
+    const closeBrackets = (cleaned.match(/\]/g) || []).length;
+
+    // Close unclosed strings, arrays, objects
+    if (!cleaned.endsWith("}")) {
+      // Find last complete value and truncate there
+      const lastQuote = cleaned.lastIndexOf('"');
+      if (lastQuote > 0 && cleaned[lastQuote - 1] !== '\\') {
+        cleaned = cleaned.substring(0, lastQuote + 1);
+      }
+      cleaned += "]".repeat(Math.max(0, openBrackets - closeBrackets));
+      cleaned += "}".repeat(Math.max(0, openBraces - closeBraces));
+    }
+
+    try {
+      return JSON.parse(cleaned) as WeeklyReportData;
+    } catch (e2) {
+      console.error("JSON repair failed:", cleaned.substring(0, 500));
+      throw new Error("Model zwrocil nieprawidlowy JSON");
+    }
+  }
 }
