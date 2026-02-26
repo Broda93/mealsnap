@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
+import { rateLimit, RATE_LIMITS, rateLimitHeaders } from "@/lib/rate-limit";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -9,6 +10,14 @@ export async function GET(request: NextRequest) {
 
   if (!user) {
     return NextResponse.json({ error: "Nie zalogowany" }, { status: 401 });
+  }
+
+  const rl = rateLimit(user.id, "measurements", RATE_LIMITS.measurements);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: `Zbyt wiele zapytan. Sprobuj za ${rl.retryAfter}s.` },
+      { status: 429, headers: rateLimitHeaders(rl) }
+    );
   }
 
   const { searchParams } = new URL(request.url);
@@ -48,6 +57,14 @@ export async function POST(request: NextRequest) {
 
     if (!user) {
       return NextResponse.json({ error: "Nie zalogowany" }, { status: 401 });
+    }
+
+    const rl = rateLimit(user.id, "measurements", RATE_LIMITS.measurements);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: `Zbyt wiele zapisan. Sprobuj za ${rl.retryAfter}s.` },
+        { status: 429, headers: rateLimitHeaders(rl) }
+      );
     }
 
     const body = await request.json();
@@ -102,6 +119,14 @@ export async function DELETE(request: NextRequest) {
 
   if (!user) {
     return NextResponse.json({ error: "Nie zalogowany" }, { status: 401 });
+  }
+
+  const rl = rateLimit(user.id, "measurements", RATE_LIMITS.measurements);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: `Zbyt wiele zapytan. Sprobuj za ${rl.retryAfter}s.` },
+      { status: 429, headers: rateLimitHeaders(rl) }
+    );
   }
 
   const { searchParams } = new URL(request.url);

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase-server";
 import { generateWeeklyReport } from "@/lib/gemini";
+import { rateLimit, RATE_LIMITS, rateLimitHeaders } from "@/lib/rate-limit";
 
 export async function POST() {
   try {
@@ -9,6 +10,15 @@ export async function POST() {
 
     if (!user) {
       return NextResponse.json({ error: "Nie zalogowany" }, { status: 401 });
+    }
+
+    // Rate limit — 5 weekly reports per day
+    const rl = rateLimit(user.id, "weeklyReport", RATE_LIMITS.weeklyReport);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { error: `Limit raportow wyczerpany. Sprobuj ponownie za ${rl.retryAfter}s.` },
+        { status: 429, headers: rateLimitHeaders(rl) }
+      );
     }
 
     // Get profile
