@@ -20,7 +20,6 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "MealSnap - Dziennik Posilkow",
   description: "Zrob zdjecie posilku, AI rozpozna kalorie i makroskladniki",
-  manifest: "/manifest.json",
 };
 
 export default function RootLayout({

@@ -1,0 +1,20 @@
+import type { MetadataRoute } from "next";
+
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    name: "MealSnap - Dziennik Posilkow",
+    short_name: "MealSnap",
+    description: "Zrob zdjecie posilku, AI rozpozna kalorie i makroskladniki",
+    start_url: "/",
+    display: "standalone",
+    background_color: "#0f0f0f",
+    theme_color: "#8b5cf6",
+    icons: [
+      {
+        src: "/icon",
+        sizes: "512x512",
+        type: "image/png",
+      },
+    ],
+  };
+}
