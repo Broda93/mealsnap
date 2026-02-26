@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import { toast } from "sonner";
-import { Camera, Upload, X, Loader2, Check, Edit3, Bookmark } from "lucide-react";
+import { Camera, Upload, X, Loader2, Check, Edit3, Bookmark, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,35 +38,51 @@ export function CameraCapture() {
   const [scoring, setScoring] = useState(false);
   const [mealScore, setMealScore] = useState<{ score: number; comment: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
 
-  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setMimeType(file.type);
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      setImage(result);
-      setAnalysis(null);
-      setSaved(false);
-    };
-    reader.readAsDataURL(file);
+  const compressImage = useCallback((file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX_SIZE = 1024;
+        let { width, height } = img;
+        if (width > MAX_SIZE || height > MAX_SIZE) {
+          const ratio = Math.min(MAX_SIZE / width, MAX_SIZE / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d")!;
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", 0.85));
+      };
+      img.src = URL.createObjectURL(file);
+    });
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const compressed = await compressImage(file);
+    setMimeType("image/jpeg");
+    setImage(compressed);
+    setAnalysis(null);
+    setSaved(false);
+  }, [compressImage]);
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     setDragActive(false);
     const file = e.dataTransfer.files?.[0];
     if (!file || !file.type.startsWith("image/")) return;
-    setMimeType(file.type);
-    const reader = new FileReader();
-    reader.onload = () => {
-      setImage(reader.result as string);
-      setAnalysis(null);
-      setSaved(false);
-    };
-    reader.readAsDataURL(file);
-  }, []);
+    const compressed = await compressImage(file);
+    setMimeType("image/jpeg");
+    setImage(compressed);
+    setAnalysis(null);
+    setSaved(false);
+  }, [compressImage]);
 
   const analyzeImage = async () => {
     if (!image) return;
@@ -114,8 +130,8 @@ export function CameraCapture() {
           image_mime: mimeType,
         }),
       });
-      if (!res.ok) throw new Error("Zapis nie powiodl sie");
       const savedMeal = await res.json();
+      if (!res.ok) throw new Error(savedMeal.error || "Zapis nie powiodl sie");
       setSaved(true);
       toast.success("Posilek zapisany!");
 
@@ -187,6 +203,7 @@ export function CameraCapture() {
     setScoring(false);
     setMealScore(null);
     if (fileRef.current) fileRef.current.value = "";
+    if (galleryRef.current) galleryRef.current.value = "";
   };
 
   const confidenceColor = {
@@ -216,7 +233,7 @@ export function CameraCapture() {
               onDragLeave={() => setDragActive(false)}
               onDrop={handleDrop}
             >
-              <div className="flex flex-col items-center justify-center py-16 gap-4 rounded-2xl">
+              <div className="flex flex-col items-center justify-center py-12 gap-4 rounded-2xl">
                 <div
                   className="rounded-2xl p-5"
                   style={{ backgroundColor: "var(--accent)" }}
@@ -226,16 +243,35 @@ export function CameraCapture() {
                 <div className="text-center">
                   <p className="font-semibold text-lg">Dodaj zdjecie posilku</p>
                   <p className="text-[var(--text-secondary)] text-sm mt-1">
-                    Przeciagnij zdjecie lub kliknij aby wybrac
+                    Zrob zdjecie lub wybierz z galerii
                   </p>
                 </div>
-                <Button
-                  onClick={() => fileRef.current?.click()}
-                  className="bg-[var(--accent)] hover:bg-[var(--accent-deep)] text-white rounded-xl shadow-sm"
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  Wybierz zdjecie
-                </Button>
+                <div className="flex gap-3">
+                  <Button
+                    onClick={() => galleryRef.current?.click()}
+                    className="bg-[var(--accent)] hover:bg-[var(--accent-deep)] text-white rounded-xl shadow-sm"
+                  >
+                    <ImageIcon className="h-4 w-4 mr-2" />
+                    Galeria
+                  </Button>
+                  <Button
+                    onClick={() => fileRef.current?.click()}
+                    variant="outline"
+                    className="rounded-xl"
+                  >
+                    <Camera className="h-4 w-4 mr-2" />
+                    Aparat
+                  </Button>
+                </div>
+                {/* Galeria - bez capture, otwiera picker plików/galerii */}
+                <input
+                  ref={galleryRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+                {/* Aparat - z capture, otwiera kamerę na telefonie */}
                 <input
                   ref={fileRef}
                   type="file"
